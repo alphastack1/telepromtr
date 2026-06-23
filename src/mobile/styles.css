@@ -1,0 +1,327 @@
+:root {
+  --bg: #050505;
+  --fg: #f7f7f2;
+  --border: #343434;
+  --font-size: 34px;
+  --line-height: 1.22;
+  --box-height: 30vh;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #050505;
+  overscroll-behavior: none;
+}
+
+body,
+button,
+input {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.mobile-app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% -120px, rgba(231, 200, 115, 0.12), transparent 260px),
+    #050505;
+}
+
+.camera-feed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #050505;
+}
+
+.camera-feed.mirrored {
+  transform: scaleX(-1);
+}
+
+.prompt-box {
+  position: absolute;
+  top: max(14px, calc(env(safe-area-inset-top) + 12px));
+  right: 7px;
+  left: 7px;
+  height: var(--box-height);
+  min-height: 112px;
+  max-height: 46vh;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, white 12%);
+  background:
+    radial-gradient(circle at 50% -26px, rgba(255, 255, 255, 0.15), transparent 46px),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.05), transparent 30%),
+    linear-gradient(180deg, rgba(18, 20, 21, 0.9), rgba(3, 3, 4, 0.92) 58%, rgba(8, 9, 10, 0.94)),
+    var(--bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.68),
+    0 14px 38px rgba(0, 0, 0, 0.46);
+}
+
+.mode-camera .prompt-box {
+  background:
+    radial-gradient(circle at 50% -26px, rgba(255, 255, 255, 0.16), transparent 46px),
+    linear-gradient(180deg, rgba(15, 17, 18, 0.78), rgba(0, 0, 0, 0.72)),
+    color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: blur(5px);
+}
+
+.scrollport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.32),
+    rgba(0, 0, 0, 0.78) 18%,
+    black 43%,
+    black 57%,
+    rgba(0, 0, 0, 0.78) 82%,
+    rgba(0, 0, 0, 0.32)
+  );
+}
+
+.scrollport::-webkit-scrollbar {
+  display: none;
+}
+
+.editor {
+  min-height: 100%;
+  outline: none;
+  color: var(--fg);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-shadow: 0 1px 14px color-mix(in srgb, var(--fg) 12%, transparent);
+  user-select: text;
+}
+
+.editor p,
+.editor div {
+  margin: 0 0 0.35em;
+}
+
+.countdown {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  color: var(--fg);
+  font-size: min(32vh, 128px);
+  font-weight: 780;
+  pointer-events: none;
+  text-shadow: 0 7px 28px rgba(0, 0, 0, 0.78);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.bottom-bar {
+  position: absolute;
+  right: 12px;
+  bottom: max(12px, calc(env(safe-area-inset-bottom) + 10px));
+  left: 12px;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  pointer-events: none;
+}
+
+.bottom-bar button {
+  pointer-events: auto;
+}
+
+button {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)),
+    rgba(12, 13, 13, 0.72);
+  color: #f7f7f2;
+  font-weight: 720;
+}
+
+.round-control {
+  display: grid;
+  width: 42px;
+  min-height: 42px;
+  place-items: center;
+  padding: 0;
+  border-radius: 11px;
+}
+
+.round-control.primary {
+  border-color: rgba(231, 200, 115, 0.55);
+}
+
+.text-control {
+  padding: 0 13px;
+  backdrop-filter: blur(8px);
+}
+
+.play-icon {
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 10px solid #f7f7f2;
+}
+
+.playing .play-icon {
+  width: 11px;
+  height: 14px;
+  margin-left: 0;
+  border: 0;
+  background:
+    linear-gradient(90deg, #f7f7f2 0 35%, transparent 35% 65%, #f7f7f2 65% 100%);
+}
+
+.settings-sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 8;
+  display: grid;
+  max-height: min(76vh, 640px);
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 14px 14px max(14px, env(safe-area-inset-bottom));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px 16px 0 0;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.12), transparent 25%),
+    linear-gradient(145deg, rgba(34, 38, 39, 0.98), rgba(9, 10, 11, 0.98) 58%, rgba(18, 20, 21, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 -22px 56px rgba(0, 0, 0, 0.58);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.brand {
+  font-size: 13px;
+  font-weight: 820;
+}
+
+#status {
+  margin-top: 2px;
+  color: #aeb8b2;
+  font-size: 12px;
+}
+
+.sheet-content {
+  overflow: auto;
+  padding-top: 10px;
+}
+
+.sheet-section {
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.sheet-section + .sheet-section {
+  margin-top: 9px;
+}
+
+.section-title {
+  margin-bottom: 9px;
+  color: #f7f0de;
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.field,
+.toggle,
+.swatch {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: #d8dedb;
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.field + .field,
+.toggle + .toggle,
+.field-row + .field-row,
+.field + .toggle,
+.toggle + .field {
+  margin-top: 9px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.field span,
+.swatch span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.toggle {
+  min-height: 40px;
+  flex-direction: row;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0 8px 0 0;
+  accent-color: #9fbf9f;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #e7c873;
+}
+
+input[type="color"] {
+  width: 100%;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+[hidden] {
+  display: none !important;
+}

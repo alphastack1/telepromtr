@@ -1,0 +1,11 @@
+{
+  "appId": "app.telepromtr",
+  "appName": "TELEPROMTR",
+  "webDir": "dist/mobile",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

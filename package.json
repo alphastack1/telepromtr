@@ -1,0 +1,57 @@
+{
+  "name": "telepromtr",
+  "version": "0.1.0",
+  "description": "A tiny, offline, frameless teleprompter for creators.",
+  "main": "dist/main/main.js",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "package:win": "npm run build && electron-packager . TELEPROMTR --platform=win32 --arch=x64 --out=release --overwrite --asar --icon=assets/app/telepromtr.ico --ignore=\"^/src$\" --ignore=\"^/scripts$\" --ignore=\"^/release$\"",
+    "package:win:portable": "npm run package:win && node scripts/build-windows-portable-nsis.mjs",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npm run android:sync && npx cap open android",
+    "apk:debug": "node scripts/build-apk-debug.mjs"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
+    "@electron/packager": "^18.3.6",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1"
+  },
+  "build": {
+    "appId": "app.telepromtr",
+    "productName": "TELEPROMTR",
+    "asar": true,
+    "directories": {
+      "output": "release/artifacts"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/app/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/app/telepromtr.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "TELEPROMTR-v0.1-windows.exe"
+    },
+    "portable": {
+      "artifactName": "TELEPROMTR-v0.1-windows.exe"
+    }
+  }
+}

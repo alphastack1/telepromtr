@@ -1,0 +1,216 @@
+:root {
+  --bg: #050505;
+  --fg: #f7f7f2;
+  --border: #343434;
+  --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size: 34px;
+  --line-height: 1.22;
+  --paragraph-spacing: 0.35em;
+  --tracking: 0px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+body {
+  font-family: var(--font-family);
+}
+
+button {
+  font: inherit;
+}
+
+.window-frame {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, white 12%);
+  background:
+    radial-gradient(circle at 50% -22px, rgba(255, 255, 255, 0.12), transparent 42px),
+    radial-gradient(circle at 92% 112%, rgba(231, 200, 115, 0.08), transparent 120px),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), transparent 28%),
+    linear-gradient(180deg, rgba(22, 24, 25, 0.94), rgba(3, 3, 4, 0.96) 54%, rgba(8, 9, 10, 0.98)),
+    var(--bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.72),
+    0 12px 34px rgba(0, 0, 0, 0.42);
+}
+
+.window-frame::before {
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+  border-radius: 2px;
+  background:
+    linear-gradient(90deg, transparent, rgba(231, 200, 115, 0.26) 48%, rgba(255, 255, 255, 0.28) 50%, transparent 52%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 32px);
+  opacity: 0.45;
+  mask-image: linear-gradient(to bottom, black 0 2px, transparent 3px);
+}
+
+.scrollport {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: none;
+  cursor: text;
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.32),
+    rgba(0, 0, 0, 0.78) 18%,
+    black 43%,
+    black 57%,
+    rgba(0, 0, 0, 0.78) 82%,
+    rgba(0, 0, 0, 0.32)
+  );
+}
+
+.scrollport::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollport.dragging {
+  cursor: move;
+}
+
+.transform-surface {
+  min-height: 100%;
+  transform-origin: center center;
+}
+
+.editor {
+  min-height: calc(100vh - 10px);
+  outline: none;
+  color: var(--fg);
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  letter-spacing: var(--tracking);
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-shadow: 0 1px 14px color-mix(in srgb, var(--fg) 12%, transparent);
+  white-space: normal;
+  user-select: text;
+}
+
+.editor:focus {
+  caret-color: #e7c873;
+}
+
+.editor::selection,
+.editor *::selection {
+  background: rgba(231, 200, 115, 0.34);
+  color: #ffffff;
+}
+
+.editor p,
+.editor div {
+  margin: 0 0 var(--paragraph-spacing);
+}
+
+.editor b,
+.editor strong {
+  font-weight: 760;
+}
+
+.editor i,
+.editor em {
+  font-style: italic;
+}
+
+.editor u {
+  text-underline-offset: 0.08em;
+}
+
+.countdown {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: var(--fg);
+  font-size: min(34vh, 120px);
+  font-weight: 780;
+  line-height: 1;
+  text-shadow: 0 7px 28px rgba(0, 0, 0, 0.78);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.play-toggle {
+  position: fixed;
+  right: 7px;
+  bottom: 7px;
+  z-index: 4;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)),
+    rgba(12, 13, 13, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 7px 18px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+  opacity: 0.54;
+  transition:
+    opacity 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.play-toggle:hover,
+.play-toggle:focus-visible,
+.play-toggle.playing {
+  border-color: rgba(231, 200, 115, 0.55);
+  opacity: 0.96;
+}
+
+.play-toggle:active {
+  transform: translateY(1px);
+}
+
+.play-icon {
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 9px solid #f7f7f2;
+  filter: drop-shadow(0 1px 5px rgba(255, 255, 255, 0.18));
+}
+
+.play-toggle.playing .play-icon {
+  width: 10px;
+  height: 12px;
+  margin-left: 0;
+  border: 0;
+  background:
+    linear-gradient(90deg, #f7f7f2 0 35%, transparent 35% 65%, #f7f7f2 65% 100%);
+}
+
+[hidden] {
+  display: none !important;
+}
