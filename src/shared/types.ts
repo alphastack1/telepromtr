@@ -121,6 +121,52 @@ export const DEFAULT_SETTINGS: TelepromtrSettings = {
   mirrorY: false
 };
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const numberSetting = (value: unknown, fallback: number, min: number, max: number, integer = false) => {
+  const numeric = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  const clamped = clamp(numeric, min, max);
+  return integer ? Math.round(clamped) : clamped;
+};
+
+const booleanSetting = (value: unknown, fallback: boolean) => (typeof value === "boolean" ? value : fallback);
+
+const colorSetting = (value: unknown, fallback: string) =>
+  typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+
+const stringSetting = (value: unknown, fallback: string) =>
+  typeof value === "string" && value.trim() ? value : fallback;
+
+const textAlignSetting = (value: unknown): TextAlign =>
+  value === "left" || value === "center" || value === "right" || value === "justify"
+    ? value
+    : DEFAULT_SETTINGS.textAlign;
+
+export const normalizeSettings = (settings?: Partial<TelepromtrSettings>): TelepromtrSettings => {
+  const source = settings || {};
+
+  return {
+    speed: numberSetting(source.speed, DEFAULT_SETTINGS.speed, 1, 140, true),
+    countdownSeconds: numberSetting(source.countdownSeconds, DEFAULT_SETTINGS.countdownSeconds, 0, 10, true),
+    loop: booleanSetting(source.loop, DEFAULT_SETTINGS.loop),
+    alwaysOnTop: booleanSetting(source.alwaysOnTop, DEFAULT_SETTINGS.alwaysOnTop),
+    windowOpacity: numberSetting(source.windowOpacity, DEFAULT_SETTINGS.windowOpacity, 0.45, 1),
+    backgroundColor: colorSetting(source.backgroundColor, DEFAULT_SETTINGS.backgroundColor),
+    textColor: colorSetting(source.textColor, DEFAULT_SETTINGS.textColor),
+    borderColor: colorSetting(source.borderColor, DEFAULT_SETTINGS.borderColor),
+    fontFamily: stringSetting(source.fontFamily, DEFAULT_SETTINGS.fontFamily),
+    fontSize: numberSetting(source.fontSize, DEFAULT_SETTINGS.fontSize, 16, 120, true),
+    autoFit: booleanSetting(source.autoFit, DEFAULT_SETTINGS.autoFit),
+    visibleLines: numberSetting(source.visibleLines, DEFAULT_SETTINGS.visibleLines, 2, 9, true),
+    lineHeight: numberSetting(source.lineHeight, DEFAULT_SETTINGS.lineHeight, 0.9, 1.8),
+    paragraphSpacing: numberSetting(source.paragraphSpacing, DEFAULT_SETTINGS.paragraphSpacing, 0, 1.6),
+    letterSpacing: numberSetting(source.letterSpacing, DEFAULT_SETTINGS.letterSpacing, 0, 6),
+    textAlign: textAlignSetting(source.textAlign),
+    mirrorX: booleanSetting(source.mirrorX, DEFAULT_SETTINGS.mirrorX),
+    mirrorY: booleanSetting(source.mirrorY, DEFAULT_SETTINGS.mirrorY)
+  };
+};
+
 export const DEFAULT_WINDOW_STATE: WindowState = {
   width: 900,
   height: 190

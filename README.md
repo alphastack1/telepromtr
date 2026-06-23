@@ -55,6 +55,7 @@ The Android app uses a mobile-specific fullscreen surface:
 - selfie-camera background mode
 - obsidian teleprompter box near the top of the screen
 - bottom controls for play, camera mode, and settings
+- camera-plus-mic recording with native sharing
 - local autosave, no network permission
 
 Prepare the Android project:

@@ -1,4 +1,6 @@
-import { DEFAULT_DOCUMENT, DEFAULT_SETTINGS, type TelepromtrSettings } from "../shared/types";
+import { Directory, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
+import { DEFAULT_DOCUMENT, DEFAULT_SETTINGS, normalizeSettings, type TelepromtrSettings } from "../shared/types";
 
 interface MobileSettings extends TelepromtrSettings {
   boxHeight: number;
@@ -24,6 +26,7 @@ const scrollport = document.querySelector<HTMLDivElement>("#scrollport")!;
 const editor = document.querySelector<HTMLDivElement>("#editor")!;
 const countdown = document.querySelector<HTMLDivElement>("#countdown")!;
 const playToggle = document.querySelector<HTMLButtonElement>("#playToggle")!;
+const recordToggle = document.querySelector<HTMLButtonElement>("#recordToggle")!;
 const cameraToggle = document.querySelector<HTMLButtonElement>("#cameraToggle")!;
 const settingsToggle = document.querySelector<HTMLButtonElement>("#settingsToggle")!;
 const settingsSheet = document.querySelector<HTMLElement>("#settingsSheet")!;
@@ -35,10 +38,20 @@ let isPlaying = false;
 let isCountingDown = false;
 let animationFrame = 0;
 let lastTick = 0;
+let scrollRemainder = 0;
 let saveTimer: number | undefined;
 let stream: MediaStream | null = null;
+let recorder: MediaRecorder | null = null;
+let recordedChunks: BlobPart[] = [];
+let isRecording = false;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const clampSetting = (value: unknown, fallback: number, min: number, max: number, integer = false) => {
+  const numeric = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  const clamped = clamp(numeric, min, max);
+  return integer ? Math.round(clamped) : clamped;
+};
 
 const load = () => {
   try {
@@ -46,7 +59,15 @@ const load = () => {
       documentHtml?: string;
       settings?: Partial<MobileSettings>;
     };
-    settings = { ...DEFAULT_MOBILE_SETTINGS, ...(saved.settings || {}) };
+    const savedSettings = saved.settings || {};
+    settings = {
+      ...DEFAULT_MOBILE_SETTINGS,
+      ...normalizeSettings(savedSettings),
+      boxHeight: clampSetting(savedSettings.boxHeight, DEFAULT_MOBILE_SETTINGS.boxHeight, 16, 72, true),
+      cameraEnabled: false,
+      cameraMirror:
+        typeof savedSettings.cameraMirror === "boolean" ? savedSettings.cameraMirror : DEFAULT_MOBILE_SETTINGS.cameraMirror
+    };
     editor.innerHTML = sanitizeHtml(saved.documentHtml || DEFAULT_DOCUMENT);
   } catch {
     settings = { ...DEFAULT_MOBILE_SETTINGS };
@@ -72,7 +93,7 @@ const getEffectiveFontSize = () => {
     return settings.fontSize;
   }
   const fitted = promptBox.clientHeight / settings.visibleLines / settings.lineHeight;
-  return clamp(Math.round(fitted), 16, 92);
+  return clamp(Math.round(Math.min(fitted, settings.fontSize)), 16, 92);
 };
 
 const applySettings = () => {
@@ -98,7 +119,7 @@ const syncControls = () => {
   setRangeValue("visibleLines", settings.visibleLines, `${settings.visibleLines}`);
   setRangeValue("fontSize", settings.fontSize, `${settings.fontSize}px`);
   setRangeValue("lineHeight", settings.lineHeight, settings.lineHeight.toFixed(2));
-  setRangeValue("boxHeight", settings.boxHeight, `${settings.boxHeight}%`);
+  setRangeValue("boxHeight", settings.boxHeight, `${settings.boxHeight}vh`);
   setChecked("loop", settings.loop);
   setChecked("autoFit", settings.autoFit);
   setChecked("mirrorX", settings.mirrorX);
@@ -108,8 +129,11 @@ const syncControls = () => {
   setValue("borderColor", settings.borderColor);
   playToggle.classList.toggle("playing", isPlaying || isCountingDown);
   playToggle.setAttribute("aria-label", isPlaying || isCountingDown ? "Pause" : "Play");
+  recordToggle.classList.toggle("recording", isRecording);
+  recordToggle.setAttribute("aria-label", isRecording ? "Stop recording" : "Start recording");
   cameraToggle.textContent = settings.cameraEnabled ? "Black" : "Camera";
-  status.textContent = isCountingDown ? "Starting" : isPlaying ? "Playing" : "Paused";
+  cameraToggle.disabled = isRecording;
+  status.textContent = isRecording ? "Recording" : isCountingDown ? "Starting" : isPlaying ? "Playing" : "Paused";
 };
 
 const setRangeValue = (id: string, value: string | number, label: string) => {
@@ -138,7 +162,14 @@ const setValue = (id: string, value: string) => {
 };
 
 const updateSetting = <K extends keyof MobileSettings>(key: K, value: MobileSettings[K]) => {
-  settings = { ...settings, [key]: value };
+  const next = { ...settings, [key]: value };
+  settings = {
+    ...next,
+    ...normalizeSettings(next),
+    boxHeight: clampSetting(next.boxHeight, DEFAULT_MOBILE_SETTINGS.boxHeight, 16, 72, true),
+    cameraEnabled: next.cameraEnabled === true,
+    cameraMirror: typeof next.cameraMirror === "boolean" ? next.cameraMirror : DEFAULT_MOBILE_SETTINGS.cameraMirror
+  };
   applySettings();
 };
 
@@ -159,10 +190,18 @@ const tick = (now: number) => {
   const delta = lastTick ? (now - lastTick) / 1000 : 0;
   lastTick = now;
   const maxTop = scrollport.scrollHeight - scrollport.clientHeight;
-  scrollport.scrollTop += settings.speed * delta;
+  const scrollDistance = settings.speed * delta + scrollRemainder;
+  const wholePixels = Math.trunc(scrollDistance);
+  scrollRemainder = scrollDistance - wholePixels;
+
+  if (wholePixels !== 0) {
+    scrollport.scrollTop += wholePixels;
+  }
+
   if (scrollport.scrollTop >= maxTop - 1) {
     if (settings.loop) {
       scrollport.scrollTop = 0;
+      scrollRemainder = 0;
     } else {
       pause();
       return;
@@ -192,6 +231,7 @@ const start = async () => {
   }
   isPlaying = true;
   lastTick = 0;
+  scrollRemainder = 0;
   syncControls();
   animationFrame = window.requestAnimationFrame(tick);
 };
@@ -204,10 +244,16 @@ const togglePlayback = () => {
   }
 };
 
-const startCamera = async () => {
+const startCamera = async (withAudio = false) => {
   try {
+    stream?.getTracks().forEach((track) => track.stop());
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
+      audio: withAudio
+        ? {
+            echoCancellation: true,
+            noiseSuppression: true
+          }
+        : false,
       video: {
         facingMode: "user",
         width: { ideal: 1280 },
@@ -217,13 +263,18 @@ const startCamera = async () => {
     camera.srcObject = stream;
     camera.hidden = false;
     updateSetting("cameraEnabled", true);
+    return true;
   } catch {
     updateSetting("cameraEnabled", false);
     camera.hidden = true;
+    return false;
   }
 };
 
 const stopCamera = () => {
+  if (isRecording) {
+    return;
+  }
   stream?.getTracks().forEach((track) => track.stop());
   stream = null;
   camera.srcObject = null;
@@ -232,11 +283,110 @@ const stopCamera = () => {
 };
 
 const toggleCamera = () => {
+  if (isRecording) {
+    return;
+  }
+
   if (settings.cameraEnabled) {
     stopCamera();
   } else {
     void startCamera();
   }
+};
+
+const getRecordingMimeType = () =>
+  ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((type) =>
+    MediaRecorder.isTypeSupported(type)
+  );
+
+const blobToBase64 = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onloadend = () => {
+      const result = String(reader.result || "");
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.readAsDataURL(blob);
+  });
+
+const shareRecording = async (blob: Blob) => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const fileName = `telepromtr-${timestamp}.webm`;
+  const data = await blobToBase64(blob);
+  const saved = await Filesystem.writeFile({
+    path: fileName,
+    data,
+    directory: Directory.Cache
+  });
+
+  const canShare = await Share.canShare().catch(() => ({ value: false }));
+  if (canShare.value) {
+    await Share.share({
+      title: "TELEPROMTR recording",
+      text: "TELEPROMTR recording",
+      files: [saved.uri],
+      dialogTitle: "Save or share recording"
+    });
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+const stopRecording = () => {
+  if (!recorder || !isRecording) {
+    return;
+  }
+  recorder.stop();
+};
+
+const startRecording = async () => {
+  if (isRecording) {
+    stopRecording();
+    return;
+  }
+
+  const cameraReady = await startCamera(true);
+  if (!cameraReady || !stream) {
+    return;
+  }
+
+  recordedChunks = [];
+  const mimeType = getRecordingMimeType();
+  try {
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  } catch {
+    stream.getAudioTracks().forEach((track) => track.stop());
+    isRecording = false;
+    recorder = null;
+    syncControls();
+    return;
+  }
+  recorder.addEventListener("dataavailable", (event) => {
+    if (event.data.size > 0) {
+      recordedChunks.push(event.data);
+    }
+  });
+  recorder.addEventListener("stop", () => {
+    const stoppedRecorder = recorder;
+    const blob = new Blob(recordedChunks, { type: stoppedRecorder?.mimeType || "video/webm" });
+    stream?.getAudioTracks().forEach((track) => track.stop());
+    isRecording = false;
+    recorder = null;
+    recordedChunks = [];
+    syncControls();
+    void shareRecording(blob).catch(() => undefined);
+  });
+
+  recorder.start(1000);
+  isRecording = true;
+  syncControls();
 };
 
 const sanitizeHtml = (html: string) => {
@@ -306,6 +456,7 @@ const bindTextInput = <K extends keyof MobileSettings>(id: string, key: K) => {
 
 const wireControls = () => {
   playToggle.addEventListener("click", togglePlayback);
+  recordToggle.addEventListener("click", () => void startRecording());
   cameraToggle.addEventListener("click", toggleCamera);
   settingsToggle.addEventListener("click", () => {
     settingsSheet.hidden = false;

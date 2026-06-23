@@ -6,6 +6,7 @@ import {
   DEFAULT_DOCUMENT,
   DEFAULT_SETTINGS,
   DEFAULT_WINDOW_STATE,
+  normalizeSettings,
   type AppSnapshot,
   type ExportPayload,
   type MenuCommand,
@@ -36,10 +37,7 @@ const menuSize = { width: 390, height: 650 };
 
 const mergeSnapshot = (stored?: StoredState): AppSnapshot => ({
   documentHtml: stored?.documentHtml || DEFAULT_DOCUMENT,
-  settings: {
-    ...DEFAULT_SETTINGS,
-    ...(stored?.settings || {})
-  },
+  settings: normalizeSettings(stored?.settings),
   windowState: {
     ...DEFAULT_WINDOW_STATE,
     ...(stored?.windowState || {})
@@ -225,7 +223,7 @@ ipcMain.handle("state:save-document", async (_event, documentHtml: string) => {
 });
 
 ipcMain.handle("state:save-settings", async (_event, settings: TelepromtrSettings) => {
-  currentSnapshot.settings = { ...DEFAULT_SETTINGS, ...settings };
+  currentSnapshot.settings = normalizeSettings(settings);
   applyWindowSettings(currentSnapshot.settings);
   await saveSnapshot();
 });

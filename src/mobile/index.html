@@ -32,6 +32,9 @@
         <button id="playToggle" class="round-control primary" type="button" aria-label="Play">
           <span class="play-icon" aria-hidden="true"></span>
         </button>
+        <button id="recordToggle" class="round-control record-control" type="button" aria-label="Start recording">
+          <span class="record-dot" aria-hidden="true"></span>
+        </button>
         <button id="cameraToggle" class="text-control" type="button">Camera</button>
         <button id="settingsToggle" class="text-control" type="button">Settings</button>
       </nav>
@@ -50,10 +53,10 @@
             <div class="section-title">Playback</div>
             <label class="field">
               <span>Speed <output id="speedValue"></output></span>
-              <input id="speed" type="range" min="0" max="140" step="1" />
+              <input id="speed" type="range" min="1" max="140" step="1" />
             </label>
             <label class="field">
-              <span>Countdown <output id="countdownValue"></output></span>
+              <span>Countdown <output id="countdownSecondsValue"></output></span>
               <input id="countdownSeconds" type="range" min="0" max="10" step="1" />
             </label>
             <label class="toggle">
@@ -85,7 +88,7 @@
               </label>
               <label class="field">
                 <span>Box <output id="boxHeightValue"></output></span>
-                <input id="boxHeight" type="range" min="18" max="55" step="1" />
+                <input id="boxHeight" type="range" min="16" max="72" step="1" />
               </label>
             </div>
           </section>

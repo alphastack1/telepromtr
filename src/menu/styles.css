@@ -64,6 +64,12 @@ select {
   font-size: 12px;
 }
 
+.menu-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .menu-content {
   overflow: auto;
   padding: 10px 2px 0 0;
@@ -223,6 +229,17 @@ button:active {
     #e7c873;
   color: #161006;
   font-weight: 780;
+}
+
+.icon-button {
+  display: grid;
+  width: 34px;
+  min-height: 34px;
+  place-items: center;
+  padding: 0;
+  color: #d9dfdc;
+  font-size: 15px;
+  line-height: 1;
 }
 
 .segmented {

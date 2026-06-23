@@ -57,8 +57,8 @@ input {
   right: 7px;
   left: 7px;
   height: var(--box-height);
-  min-height: 112px;
-  max-height: 46vh;
+  min-height: 92px;
+  max-height: min(72vh, calc(100vh - 92px));
   padding: 4px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 78%, white 12%);
@@ -159,6 +159,11 @@ button {
   font-weight: 720;
 }
 
+button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
 .round-control {
   display: grid;
   width: 42px;
@@ -170,6 +175,31 @@ button {
 
 .round-control.primary {
   border-color: rgba(231, 200, 115, 0.55);
+}
+
+.record-control {
+  border-color: rgba(255, 96, 96, 0.28);
+}
+
+.record-control.recording {
+  border-color: rgba(255, 96, 96, 0.78);
+  background:
+    linear-gradient(180deg, rgba(255, 96, 96, 0.2), rgba(255, 96, 96, 0.06)),
+    rgba(12, 13, 13, 0.72);
+}
+
+.record-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ff6969;
+  box-shadow: 0 0 14px rgba(255, 96, 96, 0.52);
+}
+
+.recording .record-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
 }
 
 .text-control {

@@ -1,4 +1,11 @@
-import { DEFAULT_SETTINGS, type MenuSnapshot, type TelepromtrBridge, type TelepromtrSettings, type TextAlign } from "../shared/types";
+import {
+  DEFAULT_SETTINGS,
+  normalizeSettings,
+  type MenuSnapshot,
+  type TelepromtrBridge,
+  type TelepromtrSettings,
+  type TextAlign
+} from "../shared/types";
 
 declare global {
   interface Window {
@@ -13,9 +20,9 @@ const playToggle = document.querySelector<HTMLButtonElement>("#playToggle")!;
 const menuStatus = document.querySelector<HTMLDivElement>("#menuStatus")!;
 
 const sendSetting = <K extends keyof TelepromtrSettings>(key: K, value: TelepromtrSettings[K]) => {
-  settings = { ...settings, [key]: value };
+  settings = normalizeSettings({ ...settings, [key]: value });
   syncControls();
-  window.telepromtr.sendMenuSetting({ key, value });
+  window.telepromtr.sendMenuSetting({ key, value: settings[key] });
 };
 
 const setRangeValue = (id: string, value: string | number, label: string) => {
@@ -95,6 +102,7 @@ const bindTextInput = <K extends keyof TelepromtrSettings>(id: string, key: K) =
 
 const wireControls = () => {
   playToggle.addEventListener("click", () => window.telepromtr.sendMenuCommand("toggle-playback"));
+  document.querySelector<HTMLButtonElement>("#closeMenu")!.addEventListener("click", () => window.telepromtr.hideMenu());
 
   bindRange("speed", "speed", Number);
   bindRange("countdownSeconds", "countdownSeconds", Number);
@@ -147,7 +155,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 window.telepromtr.onMenuState((snapshot) => {
-  settings = { ...DEFAULT_SETTINGS, ...snapshot.settings };
+  settings = normalizeSettings(snapshot.settings);
   status = snapshot.status;
   syncControls();
 });

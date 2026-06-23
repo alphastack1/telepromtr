@@ -1,6 +1,7 @@
 import {
   DEFAULT_DOCUMENT,
   DEFAULT_SETTINGS,
+  normalizeSettings,
   type ExportPayload,
   type MenuCommand,
   type MenuSnapshot,
@@ -28,6 +29,7 @@ let isPlaying = false;
 let isCountingDown = false;
 let animationFrame = 0;
 let lastTick = 0;
+let scrollRemainder = 0;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -61,6 +63,11 @@ const debounceSettingsSave = () => {
   }, 120);
 };
 
+const saveSettingsNow = () => {
+  window.clearTimeout(saveSettingsTimer);
+  void window.telepromtr.saveSettings(settings);
+};
+
 const getEffectiveFontSize = () => {
   if (!settings.autoFit) {
     return settings.fontSize;
@@ -68,7 +75,7 @@ const getEffectiveFontSize = () => {
 
   const availableHeight = Math.max(60, scrollport.clientHeight - 8);
   const fitted = availableHeight / settings.visibleLines / settings.lineHeight;
-  return clamp(Math.round(fitted), 16, 120);
+  return clamp(Math.round(Math.min(fitted, settings.fontSize)), 16, 120);
 };
 
 const applySettings = () => {
@@ -100,7 +107,11 @@ const syncPlaybackButton = () => {
 const updateSetting = <K extends keyof TelepromtrSettings>(key: K, value: TelepromtrSettings[K]) => {
   settings = { ...settings, [key]: value };
   applySettings();
-  debounceSettingsSave();
+  if (key === "alwaysOnTop" || key === "windowOpacity") {
+    saveSettingsNow();
+  } else {
+    debounceSettingsSave();
+  }
 };
 
 const isEditorFocused = () => document.activeElement === editor;
@@ -122,11 +133,18 @@ const tick = (now: number) => {
   const delta = lastTick ? (now - lastTick) / 1000 : 0;
   lastTick = now;
   const maxTop = scrollport.scrollHeight - scrollport.clientHeight;
-  scrollport.scrollTop += settings.speed * delta;
+  const scrollDistance = settings.speed * delta + scrollRemainder;
+  const wholePixels = Math.trunc(scrollDistance);
+  scrollRemainder = scrollDistance - wholePixels;
+
+  if (wholePixels !== 0) {
+    scrollport.scrollTop += wholePixels;
+  }
 
   if (scrollport.scrollTop >= maxTop - 1) {
     if (settings.loop) {
       scrollport.scrollTop = 0;
+      scrollRemainder = 0;
     } else {
       pause();
       return;
@@ -164,6 +182,7 @@ const start = async (withCountdown = true) => {
 
   isPlaying = true;
   lastTick = 0;
+  scrollRemainder = 0;
   syncPlaybackButton();
   notifyMenu();
   animationFrame = window.requestAnimationFrame(tick);
@@ -288,7 +307,7 @@ const getExportPayload = (): ExportPayload => ({
 
 const loadInitialState = async () => {
   const snapshot = await window.telepromtr.loadState();
-  settings = { ...DEFAULT_SETTINGS, ...snapshot.settings };
+  settings = normalizeSettings(snapshot.settings);
   editor.innerHTML = sanitizeHtml(snapshot.documentHtml || DEFAULT_DOCUMENT);
   applySettings();
 };
@@ -547,7 +566,8 @@ const wireGlobalEvents = () => {
 
   window.telepromtr.onMenuCommand(handleMenuCommand);
   window.telepromtr.onMenuSetting((patch) => {
-    updateSetting(patch.key, patch.value);
+    const next = normalizeSettings({ ...settings, [patch.key]: patch.value });
+    updateSetting(patch.key, next[patch.key]);
   });
 };
 

@@ -1,6 +1,6 @@
 {
   "name": "telepromtr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A tiny, offline, frameless teleprompter for creators.",
   "main": "dist/main/main.js",
   "license": "MIT",
@@ -24,7 +24,9 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
-    "@capacitor/core": "^8.4.1"
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1"
   },
   "build": {
     "appId": "app.telepromtr",
@@ -48,10 +50,10 @@
           ]
         }
       ],
-      "artifactName": "TELEPROMTR-v0.1-windows.exe"
+      "artifactName": "TELEPROMTR-v0.2-windows.exe"
     },
     "portable": {
-      "artifactName": "TELEPROMTR-v0.1-windows.exe"
+      "artifactName": "TELEPROMTR-v0.2-windows.exe"
     }
   }
 }
