@@ -41,6 +41,7 @@ let lastTick = 0;
 let scrollRemainder = 0;
 let saveTimer: number | undefined;
 let stream: MediaStream | null = null;
+let recordingAudioStream: MediaStream | null = null;
 let recorder: MediaRecorder | null = null;
 let recordedChunks: BlobPart[] = [];
 let isRecording = false;
@@ -188,6 +189,9 @@ const updateSetting = <K extends keyof MobileSettings>(key: K, value: MobileSett
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
+const hasLiveVideo = (candidate: MediaStream | null) =>
+  Boolean(candidate?.getVideoTracks().some((track) => track.readyState === "live"));
+
 const pause = () => {
   isPlaying = false;
   isCountingDown = false;
@@ -257,16 +261,17 @@ const togglePlayback = () => {
   }
 };
 
-const startCamera = async (withAudio = false) => {
+const startCamera = async () => {
+  if (hasLiveVideo(stream)) {
+    camera.hidden = false;
+    updateSetting("cameraEnabled", true);
+    return true;
+  }
+
   try {
     stream?.getTracks().forEach((track) => track.stop());
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: withAudio
-        ? {
-            echoCancellation: true,
-            noiseSuppression: true
-          }
-        : false,
+      audio: false,
       video: {
         facingMode: "user",
         width: { ideal: 1280 },
@@ -285,7 +290,7 @@ const startCamera = async (withAudio = false) => {
 };
 
 const stopCamera = () => {
-  if (isRecording) {
+  if (isRecording || isRecordingBusy) {
     return;
   }
   stream?.getTracks().forEach((track) => track.stop());
@@ -376,7 +381,7 @@ const startRecording = async () => {
   isRecordingBusy = true;
   recordingBusyLabel = "Preparing";
   syncControls();
-  const cameraReady = await startCamera(true);
+  const cameraReady = await startCamera();
   if (!cameraReady || !stream) {
     isRecordingBusy = false;
     recordingBusyLabel = "Preparing";
@@ -386,10 +391,20 @@ const startRecording = async () => {
 
   recordedChunks = [];
   const mimeType = getRecordingMimeType();
+  let recordingStream: MediaStream;
   try {
-    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    recordingAudioStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true
+      },
+      video: false
+    });
+    recordingStream = new MediaStream([...stream.getVideoTracks(), ...recordingAudioStream.getAudioTracks()]);
+    recorder = new MediaRecorder(recordingStream, mimeType ? { mimeType } : undefined);
   } catch {
-    stream.getAudioTracks().forEach((track) => track.stop());
+    recordingAudioStream?.getTracks().forEach((track) => track.stop());
+    recordingAudioStream = null;
     isRecording = false;
     isRecordingBusy = false;
     recordingBusyLabel = "Preparing";
@@ -405,7 +420,8 @@ const startRecording = async () => {
   recorder.addEventListener("stop", () => {
     const stoppedRecorder = recorder;
     const blob = new Blob(recordedChunks, { type: stoppedRecorder?.mimeType || "video/webm" });
-    stream?.getAudioTracks().forEach((track) => track.stop());
+    recordingAudioStream?.getTracks().forEach((track) => track.stop());
+    recordingAudioStream = null;
     isRecording = false;
     recorder = null;
     recordedChunks = [];

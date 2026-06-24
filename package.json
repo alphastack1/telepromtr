@@ -1,6 +1,6 @@
 {
   "name": "telepromtr",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A tiny, offline, frameless teleprompter for creators.",
   "main": "dist/main/main.js",
   "license": "MIT",
@@ -9,8 +9,7 @@
     "build": "node scripts/build.mjs",
     "start": "npm run build && electron .",
     "package:win": "npm run build && electron-packager . TELEPROMTR --platform=win32 --arch=x64 --out=release --overwrite --asar --icon=assets/app/telepromtr.ico --ignore=\"^/src$\" --ignore=\"^/scripts$\" --ignore=\"^/release$\"",
-    "package:win:zip": "npm run package:win && node scripts/build-windows-zip.mjs",
-    "package:win:portable": "npm run package:win:zip",
+    "package:win:portable": "npm run package:win && node scripts/build-windows-portable-nsis.mjs",
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npm run android:sync && npx cap open android",
     "apk:debug": "node scripts/build-apk-debug.mjs"
@@ -45,13 +44,16 @@
       "icon": "assets/app/telepromtr.ico",
       "target": [
         {
-          "target": "zip",
+          "target": "portable",
           "arch": [
             "x64"
           ]
         }
       ],
-      "artifactName": "TELEPROMTR-v0.3-windows.zip"
+      "artifactName": "TELEPROMTR-v0.4-windows.exe"
+    },
+    "portable": {
+      "artifactName": "TELEPROMTR-v0.4-windows.exe"
     }
   }
 }

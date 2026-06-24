@@ -42,10 +42,12 @@ npm start
 ## Package Windows
 
 ```powershell
-npm run package:win:zip
+npm run package:win:portable
 ```
 
-The Windows release zip is written to `release/artifacts/`. It contains a normal app folder with `TELEPROMTR.exe` inside, so startup is immediate after extraction. `npm run package:win:portable` is kept as an alias for the same zip build.
+The standalone Windows exe is written to `release/artifacts/`. It shows a small startup banner on first launch while it unpacks the app, then reuses the cached app folder on later launches.
+
+Unsigned Windows builds can still show Microsoft Defender SmartScreen until the app is distributed through the Microsoft Store or signed with a publisher identity that earns reputation.
 
 ## Android
 
