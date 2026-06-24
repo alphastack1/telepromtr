@@ -44,6 +44,8 @@ let stream: MediaStream | null = null;
 let recorder: MediaRecorder | null = null;
 let recordedChunks: BlobPart[] = [];
 let isRecording = false;
+let isRecordingBusy = false;
+let recordingBusyLabel = "Preparing";
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -130,10 +132,21 @@ const syncControls = () => {
   playToggle.classList.toggle("playing", isPlaying || isCountingDown);
   playToggle.setAttribute("aria-label", isPlaying || isCountingDown ? "Pause" : "Play");
   recordToggle.classList.toggle("recording", isRecording);
+  recordToggle.classList.toggle("busy", isRecordingBusy);
+  recordToggle.textContent = isRecording ? "Stop" : isRecordingBusy ? "Wait" : "Record";
+  recordToggle.disabled = isRecordingBusy && !isRecording;
   recordToggle.setAttribute("aria-label", isRecording ? "Stop recording" : "Start recording");
   cameraToggle.textContent = settings.cameraEnabled ? "Black" : "Camera";
-  cameraToggle.disabled = isRecording;
-  status.textContent = isRecording ? "Recording" : isCountingDown ? "Starting" : isPlaying ? "Playing" : "Paused";
+  cameraToggle.disabled = isRecording || isRecordingBusy;
+  status.textContent = isRecording
+    ? "Recording"
+    : isRecordingBusy
+      ? recordingBusyLabel
+      : isCountingDown
+        ? "Starting"
+        : isPlaying
+          ? "Playing"
+          : "Paused";
 };
 
 const setRangeValue = (id: string, value: string | number, label: string) => {
@@ -340,9 +353,13 @@ const shareRecording = async (blob: Blob) => {
 };
 
 const stopRecording = () => {
-  if (!recorder || !isRecording) {
+  if (!recorder || !isRecording || isRecordingBusy) {
     return;
   }
+  isRecordingBusy = true;
+  recordingBusyLabel = "Saving";
+  isRecording = false;
+  syncControls();
   recorder.stop();
 };
 
@@ -352,8 +369,18 @@ const startRecording = async () => {
     return;
   }
 
+  if (isRecordingBusy) {
+    return;
+  }
+
+  isRecordingBusy = true;
+  recordingBusyLabel = "Preparing";
+  syncControls();
   const cameraReady = await startCamera(true);
   if (!cameraReady || !stream) {
+    isRecordingBusy = false;
+    recordingBusyLabel = "Preparing";
+    syncControls();
     return;
   }
 
@@ -364,6 +391,8 @@ const startRecording = async () => {
   } catch {
     stream.getAudioTracks().forEach((track) => track.stop());
     isRecording = false;
+    isRecordingBusy = false;
+    recordingBusyLabel = "Preparing";
     recorder = null;
     syncControls();
     return;
@@ -381,11 +410,18 @@ const startRecording = async () => {
     recorder = null;
     recordedChunks = [];
     syncControls();
-    void shareRecording(blob).catch(() => undefined);
+    void shareRecording(blob)
+      .catch(() => undefined)
+      .finally(() => {
+        isRecordingBusy = false;
+        recordingBusyLabel = "Preparing";
+        syncControls();
+      });
   });
 
   recorder.start(1000);
   isRecording = true;
+  isRecordingBusy = false;
   syncControls();
 };
 

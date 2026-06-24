@@ -102,7 +102,9 @@ const bindTextInput = <K extends keyof TelepromtrSettings>(id: string, key: K) =
 
 const wireControls = () => {
   playToggle.addEventListener("click", () => window.telepromtr.sendMenuCommand("toggle-playback"));
-  document.querySelector<HTMLButtonElement>("#closeMenu")!.addEventListener("click", () => window.telepromtr.hideMenu());
+  document.querySelector<HTMLButtonElement>("#closeApp")!.addEventListener("click", () => {
+    window.telepromtr.sendMenuCommand("quit-app");
+  });
 
   bindRange("speed", "speed", Number);
   bindRange("countdownSeconds", "countdownSeconds", Number);

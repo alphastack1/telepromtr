@@ -249,6 +249,11 @@ ipcMain.on("menu:update-state", (_event, snapshot: MenuSnapshot) => {
 });
 
 ipcMain.on("menu:command", (_event, command: MenuCommand) => {
+  if (command === "quit-app") {
+    app.quit();
+    return;
+  }
+
   if (command === "hide-menu") {
     menuWindow?.hide();
     return;

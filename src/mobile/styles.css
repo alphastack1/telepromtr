@@ -178,28 +178,15 @@ button:disabled {
 }
 
 .record-control {
-  border-color: rgba(255, 96, 96, 0.28);
+  border-color: rgba(255, 96, 96, 0.36);
 }
 
-.record-control.recording {
+.record-control.recording,
+.record-control.busy {
   border-color: rgba(255, 96, 96, 0.78);
   background:
     linear-gradient(180deg, rgba(255, 96, 96, 0.2), rgba(255, 96, 96, 0.06)),
     rgba(12, 13, 13, 0.72);
-}
-
-.record-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #ff6969;
-  box-shadow: 0 0 14px rgba(255, 96, 96, 0.52);
-}
-
-.recording .record-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
 }
 
 .text-control {

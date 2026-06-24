@@ -42,10 +42,10 @@ npm start
 ## Package Windows
 
 ```powershell
-npm run package:win:portable
+npm run package:win:zip
 ```
 
-The standalone Windows exe is written to `release/artifacts/`. For an expanded folder build, run `npm run package:win`.
+The Windows release zip is written to `release/artifacts/`. It contains a normal app folder with `TELEPROMTR.exe` inside, so startup is immediate after extraction. `npm run package:win:portable` is kept as an alias for the same zip build.
 
 ## Android
 

@@ -50,6 +50,7 @@ export type MenuCommand =
   | "open-script"
   | "export-script"
   | "reset-window"
+  | "quit-app"
   | "hide-menu";
 
 export interface MenuSettingPatch<K extends keyof TelepromtrSettings = keyof TelepromtrSettings> {
