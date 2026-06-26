@@ -144,6 +144,27 @@ input {
   pointer-events: none;
 }
 
+.recording-status {
+  position: absolute;
+  right: 12px;
+  bottom: max(62px, calc(env(safe-area-inset-bottom) + 60px));
+  left: 12px;
+  z-index: 5;
+  max-width: calc(100% - 24px);
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 9px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
+    rgba(8, 9, 10, 0.72);
+  color: #f4f1ea;
+  font-size: 12px;
+  font-weight: 720;
+  text-align: right;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(9px);
+}
+
 .bottom-bar button {
   pointer-events: auto;
 }
@@ -178,6 +199,7 @@ button:disabled {
 }
 
 .record-control {
+  min-width: 86px;
   border-color: rgba(255, 96, 96, 0.36);
 }
 

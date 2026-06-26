@@ -27,6 +27,7 @@
       </section>
 
       <div id="countdown" class="countdown" hidden></div>
+      <div id="recordingStatus" class="recording-status" aria-live="polite" hidden></div>
 
       <nav class="bottom-bar" aria-label="Prompt controls">
         <button id="playToggle" class="round-control primary" type="button" aria-label="Play">
@@ -110,13 +111,17 @@
             <div class="field-row">
               <label class="toggle">
                 <input id="mirrorX" type="checkbox" />
-                <span>Mirror text</span>
+                <span>Flip text H</span>
               </label>
               <label class="toggle">
-                <input id="cameraMirror" type="checkbox" />
-                <span>Mirror camera</span>
+                <input id="mirrorY" type="checkbox" />
+                <span>Flip text V</span>
               </label>
             </div>
+            <label class="toggle">
+              <input id="cameraMirror" type="checkbox" />
+              <span>Mirror camera preview</span>
+            </label>
           </section>
         </section>
       </aside>

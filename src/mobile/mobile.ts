@@ -32,6 +32,7 @@ const settingsToggle = document.querySelector<HTMLButtonElement>("#settingsToggl
 const settingsSheet = document.querySelector<HTMLElement>("#settingsSheet")!;
 const closeSettings = document.querySelector<HTMLButtonElement>("#closeSettings")!;
 const status = document.querySelector<HTMLDivElement>("#status")!;
+const recordingStatus = document.querySelector<HTMLDivElement>("#recordingStatus")!;
 
 let settings: MobileSettings = { ...DEFAULT_MOBILE_SETTINGS };
 let isPlaying = false;
@@ -41,12 +42,15 @@ let lastTick = 0;
 let scrollRemainder = 0;
 let saveTimer: number | undefined;
 let stream: MediaStream | null = null;
-let recordingAudioStream: MediaStream | null = null;
 let recorder: MediaRecorder | null = null;
 let recordedChunks: BlobPart[] = [];
 let isRecording = false;
 let isRecordingBusy = false;
 let recordingBusyLabel = "Preparing";
+let recordingStartedAt = 0;
+let recordingTimer: number | undefined;
+let recordingMessage = "";
+let clearRecordingMessageTimer: number | undefined;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -99,6 +103,27 @@ const getEffectiveFontSize = () => {
   return clamp(Math.round(Math.min(fitted, settings.fontSize)), 16, 92);
 };
 
+const formatDuration = (milliseconds: number) => {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+};
+
+const getRecordingElapsed = () => (recordingStartedAt ? formatDuration(Date.now() - recordingStartedAt) : "0:00");
+
+const setRecordingMessage = (message: string, autoClear = false) => {
+  window.clearTimeout(clearRecordingMessageTimer);
+  recordingMessage = message;
+  if (autoClear && message) {
+    clearRecordingMessageTimer = window.setTimeout(() => {
+      recordingMessage = "";
+      syncControls();
+    }, 5000);
+  }
+  syncControls();
+};
+
 const applySettings = () => {
   const root = document.documentElement;
   root.style.setProperty("--bg", settings.backgroundColor);
@@ -126,6 +151,7 @@ const syncControls = () => {
   setChecked("loop", settings.loop);
   setChecked("autoFit", settings.autoFit);
   setChecked("mirrorX", settings.mirrorX);
+  setChecked("mirrorY", settings.mirrorY);
   setChecked("cameraMirror", settings.cameraMirror);
   setValue("textColor", settings.textColor);
   setValue("backgroundColor", settings.backgroundColor);
@@ -134,12 +160,12 @@ const syncControls = () => {
   playToggle.setAttribute("aria-label", isPlaying || isCountingDown ? "Pause" : "Play");
   recordToggle.classList.toggle("recording", isRecording);
   recordToggle.classList.toggle("busy", isRecordingBusy);
-  recordToggle.textContent = isRecording ? "Stop" : isRecordingBusy ? "Wait" : "Record";
+  recordToggle.textContent = isRecording ? `Stop ${getRecordingElapsed()}` : isRecordingBusy ? recordingBusyLabel : "Record";
   recordToggle.disabled = isRecordingBusy && !isRecording;
   recordToggle.setAttribute("aria-label", isRecording ? "Stop recording" : "Start recording");
   cameraToggle.textContent = settings.cameraEnabled ? "Black" : "Camera";
   cameraToggle.disabled = isRecording || isRecordingBusy;
-  status.textContent = isRecording
+  const statusText = isRecording
     ? "Recording"
     : isRecordingBusy
       ? recordingBusyLabel
@@ -148,6 +174,14 @@ const syncControls = () => {
         : isPlaying
           ? "Playing"
           : "Paused";
+  status.textContent = statusText;
+  const visibleRecordingMessage = isRecording
+    ? `Recording ${getRecordingElapsed()}`
+    : isRecordingBusy
+      ? recordingBusyLabel
+      : recordingMessage;
+  recordingStatus.hidden = !visibleRecordingMessage;
+  recordingStatus.textContent = visibleRecordingMessage;
 };
 
 const setRangeValue = (id: string, value: string | number, label: string) => {
@@ -189,8 +223,48 @@ const updateSetting = <K extends keyof MobileSettings>(key: K, value: MobileSett
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
+const isLiveTrack = (track: MediaStreamTrack) => track.readyState === "live";
+
 const hasLiveVideo = (candidate: MediaStream | null) =>
-  Boolean(candidate?.getVideoTracks().some((track) => track.readyState === "live"));
+  Boolean(candidate?.getVideoTracks().some(isLiveTrack));
+
+const hasLiveAudio = (candidate: MediaStream | null) =>
+  Boolean(candidate?.getAudioTracks().some(isLiveTrack));
+
+const stopStream = (candidate: MediaStream | null) => {
+  candidate?.getTracks().forEach((track) => track.stop());
+};
+
+const stopAudioTracks = (candidate: MediaStream | null) => {
+  candidate?.getAudioTracks().forEach((track) => track.stop());
+};
+
+const describeMediaError = (error: unknown) => {
+  if (error instanceof DOMException) {
+    if (error.name === "NotAllowedError") {
+      return "Camera or mic permission blocked";
+    }
+    if (error.name === "NotFoundError") {
+      return "Camera or mic not found";
+    }
+    if (error.name === "NotReadableError") {
+      return "Camera or mic is busy";
+    }
+  }
+  return "Recording could not start";
+};
+
+const startRecordingClock = () => {
+  window.clearInterval(recordingTimer);
+  recordingStartedAt = Date.now();
+  recordingTimer = window.setInterval(syncControls, 500);
+};
+
+const stopRecordingClock = () => {
+  window.clearInterval(recordingTimer);
+  recordingTimer = undefined;
+  recordingStartedAt = 0;
+};
 
 const pause = () => {
   isPlaying = false;
@@ -261,30 +335,41 @@ const togglePlayback = () => {
   }
 };
 
-const startCamera = async () => {
-  if (hasLiveVideo(stream)) {
+const startCamera = async (withAudio = false) => {
+  if (hasLiveVideo(stream) && (!withAudio || hasLiveAudio(stream))) {
     camera.hidden = false;
     updateSetting("cameraEnabled", true);
     return true;
   }
 
   try {
-    stream?.getTracks().forEach((track) => track.stop());
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
+    const nextStream = await navigator.mediaDevices.getUserMedia({
+      audio: withAudio
+        ? {
+            echoCancellation: true,
+            noiseSuppression: true
+          }
+        : false,
       video: {
         facingMode: "user",
         width: { ideal: 1280 },
         height: { ideal: 720 }
       }
     });
+    const previousStream = stream;
+    stream = nextStream;
     camera.srcObject = stream;
     camera.hidden = false;
+    await camera.play().catch(() => undefined);
+    stopStream(previousStream);
     updateSetting("cameraEnabled", true);
     return true;
-  } catch {
-    updateSetting("cameraEnabled", false);
-    camera.hidden = true;
+  } catch (error) {
+    if (!hasLiveVideo(stream)) {
+      updateSetting("cameraEnabled", false);
+      camera.hidden = true;
+    }
+    setRecordingMessage(describeMediaError(error), true);
     return false;
   }
 };
@@ -293,7 +378,7 @@ const stopCamera = () => {
   if (isRecording || isRecordingBusy) {
     return;
   }
-  stream?.getTracks().forEach((track) => track.stop());
+  stopStream(stream);
   stream = null;
   camera.srcObject = null;
   camera.hidden = true;
@@ -313,9 +398,11 @@ const toggleCamera = () => {
 };
 
 const getRecordingMimeType = () =>
-  ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((type) =>
-    MediaRecorder.isTypeSupported(type)
-  );
+  typeof MediaRecorder === "undefined"
+    ? undefined
+    : ["video/webm;codecs=vp8,opus", "video/webm;codecs=vp8", "video/webm"].find((type) =>
+        MediaRecorder.isTypeSupported(type)
+      );
 
 const blobToBase64 = (blob: Blob) =>
   new Promise<string>((resolve, reject) => {
@@ -346,7 +433,7 @@ const shareRecording = async (blob: Blob) => {
       files: [saved.uri],
       dialogTitle: "Save or share recording"
     });
-    return;
+    return fileName;
   }
 
   const url = URL.createObjectURL(blob);
@@ -355,6 +442,7 @@ const shareRecording = async (blob: Blob) => {
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+  return fileName;
 };
 
 const stopRecording = () => {
@@ -365,7 +453,16 @@ const stopRecording = () => {
   recordingBusyLabel = "Saving";
   isRecording = false;
   syncControls();
-  recorder.stop();
+  if (recorder.state === "recording") {
+    recorder.requestData();
+    recorder.stop();
+  } else {
+    stopRecordingClock();
+    recorder = null;
+    isRecordingBusy = false;
+    recordingBusyLabel = "Preparing";
+    setRecordingMessage("Recording stopped unexpectedly", true);
+  }
 };
 
 const startRecording = async () => {
@@ -381,7 +478,7 @@ const startRecording = async () => {
   isRecordingBusy = true;
   recordingBusyLabel = "Preparing";
   syncControls();
-  const cameraReady = await startCamera();
+  const cameraReady = await startCamera(true);
   if (!cameraReady || !stream) {
     isRecordingBusy = false;
     recordingBusyLabel = "Preparing";
@@ -389,45 +486,76 @@ const startRecording = async () => {
     return;
   }
 
+  if (typeof MediaRecorder === "undefined") {
+    isRecordingBusy = false;
+    recordingBusyLabel = "Preparing";
+    setRecordingMessage("Recording is not supported on this device", true);
+    return;
+  }
+
+  if (!hasLiveVideo(stream) || !hasLiveAudio(stream)) {
+    isRecordingBusy = false;
+    recordingBusyLabel = "Preparing";
+    setRecordingMessage("Camera and mic are required", true);
+    return;
+  }
+
   recordedChunks = [];
   const mimeType = getRecordingMimeType();
-  let recordingStream: MediaStream;
   try {
-    recordingAudioStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true
-      },
-      video: false
-    });
-    recordingStream = new MediaStream([...stream.getVideoTracks(), ...recordingAudioStream.getAudioTracks()]);
-    recorder = new MediaRecorder(recordingStream, mimeType ? { mimeType } : undefined);
-  } catch {
-    recordingAudioStream?.getTracks().forEach((track) => track.stop());
-    recordingAudioStream = null;
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  } catch (error) {
+    console.error("TELEPROMTR recording could not start", error);
     isRecording = false;
     isRecordingBusy = false;
     recordingBusyLabel = "Preparing";
     recorder = null;
+    setRecordingMessage("Recording could not start", true);
     syncControls();
     return;
   }
+
   recorder.addEventListener("dataavailable", (event) => {
     if (event.data.size > 0) {
       recordedChunks.push(event.data);
     }
   });
+
+  recorder.addEventListener("error", (event) => {
+    const recorderError = (event as Event & { error?: DOMException }).error;
+    console.error("TELEPROMTR recording error", recorderError || event);
+    if (recorder?.state === "recording") {
+      recorder.stop();
+    }
+    setRecordingMessage("Recording failed", true);
+  });
+
   recorder.addEventListener("stop", () => {
     const stoppedRecorder = recorder;
     const blob = new Blob(recordedChunks, { type: stoppedRecorder?.mimeType || "video/webm" });
-    recordingAudioStream?.getTracks().forEach((track) => track.stop());
-    recordingAudioStream = null;
+    stopAudioTracks(stream);
+    stopRecordingClock();
     isRecording = false;
     recorder = null;
     recordedChunks = [];
+    if (blob.size === 0) {
+      isRecordingBusy = false;
+      recordingBusyLabel = "Preparing";
+      setRecordingMessage("Recording failed: empty file", true);
+      syncControls();
+      return;
+    }
+
+    recordingBusyLabel = "Opening share";
     syncControls();
     void shareRecording(blob)
-      .catch(() => undefined)
+      .then((fileName) => {
+        setRecordingMessage(`Saved ${fileName}`, true);
+      })
+      .catch((error) => {
+        console.error("TELEPROMTR recording share failed", error);
+        setRecordingMessage("Recording saved, share failed", true);
+      })
       .finally(() => {
         isRecordingBusy = false;
         recordingBusyLabel = "Preparing";
@@ -435,9 +563,11 @@ const startRecording = async () => {
       });
   });
 
-  recorder.start(1000);
+  recorder.start(500);
   isRecording = true;
   isRecordingBusy = false;
+  recordingMessage = "";
+  startRecordingClock();
   syncControls();
 };
 
@@ -526,6 +656,7 @@ const wireControls = () => {
   bindCheckbox("loop", "loop");
   bindCheckbox("autoFit", "autoFit");
   bindCheckbox("mirrorX", "mirrorX");
+  bindCheckbox("mirrorY", "mirrorY");
   bindCheckbox("cameraMirror", "cameraMirror");
   bindTextInput("textColor", "textColor");
   bindTextInput("backgroundColor", "backgroundColor");
@@ -536,6 +667,10 @@ const wireControls = () => {
     save();
   });
   editor.addEventListener("focus", pause);
+  window.addEventListener("pagehide", () => {
+    stopStream(stream);
+    stopRecordingClock();
+  });
 };
 
 load();
