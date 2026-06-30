@@ -6,6 +6,8 @@ interface MobileSettings extends TelepromtrSettings {
   boxHeight: number;
   cameraEnabled: boolean;
   cameraMirror: boolean;
+  cameraDeviceId: string;
+  microphoneDeviceId: string;
 }
 
 const DEFAULT_MOBILE_SETTINGS: MobileSettings = {
@@ -14,7 +16,9 @@ const DEFAULT_MOBILE_SETTINGS: MobileSettings = {
   borderColor: "#343434",
   boxHeight: 30,
   cameraEnabled: false,
-  cameraMirror: true
+  cameraMirror: true,
+  cameraDeviceId: "",
+  microphoneDeviceId: ""
 };
 
 const STORAGE_KEY = "telepromtr.mobile.v1";
@@ -33,6 +37,8 @@ const settingsSheet = document.querySelector<HTMLElement>("#settingsSheet")!;
 const closeSettings = document.querySelector<HTMLButtonElement>("#closeSettings")!;
 const status = document.querySelector<HTMLDivElement>("#status")!;
 const recordingStatus = document.querySelector<HTMLDivElement>("#recordingStatus")!;
+const cameraDeviceSelect = document.querySelector<HTMLSelectElement>("#cameraDeviceId")!;
+const microphoneDeviceSelect = document.querySelector<HTMLSelectElement>("#microphoneDeviceId")!;
 
 let settings: MobileSettings = { ...DEFAULT_MOBILE_SETTINGS };
 let isPlaying = false;
@@ -51,6 +57,7 @@ let recordingStartedAt = 0;
 let recordingTimer: number | undefined;
 let recordingMessage = "";
 let clearRecordingMessageTimer: number | undefined;
+let mediaDevices: MediaDeviceInfo[] = [];
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -59,6 +66,8 @@ const clampSetting = (value: unknown, fallback: number, min: number, max: number
   const clamped = clamp(numeric, min, max);
   return integer ? Math.round(clamped) : clamped;
 };
+
+const stringSetting = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
 
 const load = () => {
   try {
@@ -73,7 +82,9 @@ const load = () => {
       boxHeight: clampSetting(savedSettings.boxHeight, DEFAULT_MOBILE_SETTINGS.boxHeight, 16, 72, true),
       cameraEnabled: false,
       cameraMirror:
-        typeof savedSettings.cameraMirror === "boolean" ? savedSettings.cameraMirror : DEFAULT_MOBILE_SETTINGS.cameraMirror
+        typeof savedSettings.cameraMirror === "boolean" ? savedSettings.cameraMirror : DEFAULT_MOBILE_SETTINGS.cameraMirror,
+      cameraDeviceId: stringSetting(savedSettings.cameraDeviceId),
+      microphoneDeviceId: stringSetting(savedSettings.microphoneDeviceId)
     };
     editor.innerHTML = sanitizeHtml(saved.documentHtml || DEFAULT_DOCUMENT);
   } catch {
@@ -153,6 +164,8 @@ const syncControls = () => {
   setChecked("mirrorX", settings.mirrorX);
   setChecked("mirrorY", settings.mirrorY);
   setChecked("cameraMirror", settings.cameraMirror);
+  setValue("cameraDeviceId", settings.cameraDeviceId);
+  setValue("microphoneDeviceId", settings.microphoneDeviceId);
   setValue("textColor", settings.textColor);
   setValue("backgroundColor", settings.backgroundColor);
   setValue("borderColor", settings.borderColor);
@@ -165,6 +178,8 @@ const syncControls = () => {
   recordToggle.setAttribute("aria-label", isRecording ? "Stop recording" : "Start recording");
   cameraToggle.textContent = settings.cameraEnabled ? "Black" : "Camera";
   cameraToggle.disabled = isRecording || isRecordingBusy;
+  cameraDeviceSelect.disabled = isRecording || isRecordingBusy;
+  microphoneDeviceSelect.disabled = isRecording || isRecordingBusy;
   const statusText = isRecording
     ? "Recording"
     : isRecordingBusy
@@ -203,7 +218,7 @@ const setChecked = (id: string, value: boolean) => {
 };
 
 const setValue = (id: string, value: string) => {
-  const input = document.querySelector<HTMLInputElement>(`#${id}`);
+  const input = document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`);
   if (input && document.activeElement !== input) {
     input.value = value;
   }
@@ -216,7 +231,9 @@ const updateSetting = <K extends keyof MobileSettings>(key: K, value: MobileSett
     ...normalizeSettings(next),
     boxHeight: clampSetting(next.boxHeight, DEFAULT_MOBILE_SETTINGS.boxHeight, 16, 72, true),
     cameraEnabled: next.cameraEnabled === true,
-    cameraMirror: typeof next.cameraMirror === "boolean" ? next.cameraMirror : DEFAULT_MOBILE_SETTINGS.cameraMirror
+    cameraMirror: typeof next.cameraMirror === "boolean" ? next.cameraMirror : DEFAULT_MOBILE_SETTINGS.cameraMirror,
+    cameraDeviceId: stringSetting(next.cameraDeviceId),
+    microphoneDeviceId: stringSetting(next.microphoneDeviceId)
   };
   applySettings();
 };
@@ -264,6 +281,91 @@ const stopRecordingClock = () => {
   window.clearInterval(recordingTimer);
   recordingTimer = undefined;
   recordingStartedAt = 0;
+};
+
+const renderDeviceOptions = (
+  select: HTMLSelectElement,
+  devices: MediaDeviceInfo[],
+  selectedDeviceId: string,
+  defaultLabel: string,
+  fallbackLabel: string
+) => {
+  const previousValue = select.value;
+  select.replaceChildren();
+  select.add(new Option(defaultLabel, ""));
+  devices.forEach((device, index) => {
+    select.add(new Option(device.label || `${fallbackLabel} ${index + 1}`, device.deviceId));
+  });
+  if (selectedDeviceId && !devices.some((device) => device.deviceId === selectedDeviceId)) {
+    select.add(new Option(`Selected ${fallbackLabel.toLowerCase()}`, selectedDeviceId));
+  }
+  select.value = selectedDeviceId;
+  if (!selectedDeviceId && previousValue && devices.some((device) => device.deviceId === previousValue)) {
+    select.value = previousValue;
+  }
+};
+
+const refreshMediaDevices = async () => {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    return;
+  }
+
+  try {
+    mediaDevices = await navigator.mediaDevices.enumerateDevices();
+  } catch {
+    mediaDevices = [];
+  }
+
+  renderDeviceOptions(
+    cameraDeviceSelect,
+    mediaDevices.filter((device) => device.kind === "videoinput"),
+    settings.cameraDeviceId,
+    "Default camera",
+    "Camera"
+  );
+  renderDeviceOptions(
+    microphoneDeviceSelect,
+    mediaDevices.filter((device) => device.kind === "audioinput"),
+    settings.microphoneDeviceId,
+    "Default mic",
+    "Mic"
+  );
+};
+
+const getVideoConstraints = (useSelectedDevice = true): MediaTrackConstraints => ({
+  ...(useSelectedDevice && settings.cameraDeviceId
+    ? { deviceId: { exact: settings.cameraDeviceId } }
+    : { facingMode: "user" }),
+  width: { ideal: 1280 },
+  height: { ideal: 720 }
+});
+
+const getAudioConstraints = (useSelectedDevice = true): MediaTrackConstraints => ({
+  ...(useSelectedDevice && settings.microphoneDeviceId ? { deviceId: { exact: settings.microphoneDeviceId } } : {}),
+  echoCancellation: true,
+  noiseSuppression: true
+});
+
+const shouldFallbackToDefaultDevice = (error: unknown) =>
+  error instanceof DOMException && error.name !== "NotAllowedError" && error.name !== "SecurityError";
+
+const requestMediaStream = async (withAudio: boolean) => {
+  const usesSelectedDevice = Boolean(settings.cameraDeviceId || (withAudio && settings.microphoneDeviceId));
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: withAudio ? getAudioConstraints(true) : false,
+      video: getVideoConstraints(true)
+    });
+  } catch (error) {
+    if (usesSelectedDevice && shouldFallbackToDefaultDevice(error)) {
+      setRecordingMessage("Selected device unavailable; using default", true);
+      return navigator.mediaDevices.getUserMedia({
+        audio: withAudio ? getAudioConstraints(false) : false,
+        video: getVideoConstraints(false)
+      });
+    }
+    throw error;
+  }
 };
 
 const pause = () => {
@@ -343,19 +445,7 @@ const startCamera = async (withAudio = false) => {
   }
 
   try {
-    const nextStream = await navigator.mediaDevices.getUserMedia({
-      audio: withAudio
-        ? {
-            echoCancellation: true,
-            noiseSuppression: true
-          }
-        : false,
-      video: {
-        facingMode: "user",
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    });
+    const nextStream = await requestMediaStream(withAudio);
     const previousStream = stream;
     stream = nextStream;
     camera.srcObject = stream;
@@ -363,6 +453,7 @@ const startCamera = async (withAudio = false) => {
     await camera.play().catch(() => undefined);
     stopStream(previousStream);
     updateSetting("cameraEnabled", true);
+    void refreshMediaDevices();
     return true;
   } catch (error) {
     if (!hasLiveVideo(stream)) {
@@ -636,6 +727,15 @@ const bindTextInput = <K extends keyof MobileSettings>(id: string, key: K) => {
   });
 };
 
+const bindMediaDeviceSelect = (select: HTMLSelectElement, key: "cameraDeviceId" | "microphoneDeviceId") => {
+  select.addEventListener("input", () => {
+    updateSetting(key, select.value);
+    if (key === "cameraDeviceId" && settings.cameraEnabled && !isRecording && !isRecordingBusy) {
+      void startCamera(false);
+    }
+  });
+};
+
 const wireControls = () => {
   playToggle.addEventListener("click", togglePlayback);
   recordToggle.addEventListener("click", () => void startRecording());
@@ -658,6 +758,8 @@ const wireControls = () => {
   bindCheckbox("mirrorX", "mirrorX");
   bindCheckbox("mirrorY", "mirrorY");
   bindCheckbox("cameraMirror", "cameraMirror");
+  bindMediaDeviceSelect(cameraDeviceSelect, "cameraDeviceId");
+  bindMediaDeviceSelect(microphoneDeviceSelect, "microphoneDeviceId");
   bindTextInput("textColor", "textColor");
   bindTextInput("backgroundColor", "backgroundColor");
   bindTextInput("borderColor", "borderColor");
@@ -671,8 +773,12 @@ const wireControls = () => {
     stopStream(stream);
     stopRecordingClock();
   });
+  navigator.mediaDevices?.addEventListener("devicechange", () => {
+    void refreshMediaDevices();
+  });
 };
 
 load();
 wireControls();
 applySettings();
+void refreshMediaDevices();

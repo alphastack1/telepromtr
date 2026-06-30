@@ -300,6 +300,19 @@ const selectAllEditor = () => {
   selection.addRange(range);
 };
 
+const selectWordFromPoint = (x: number, y: number) => {
+  placeCaretFromPoint(x, y);
+  const selection = window.getSelection();
+  const editableSelection = selection as (Selection & {
+    modify?: (alter: "move" | "extend", direction: "forward" | "backward", granularity: "word") => void;
+  }) | null;
+  if (!editableSelection?.modify) {
+    return;
+  }
+  editableSelection.modify("move", "backward", "word");
+  editableSelection.modify("extend", "forward", "word");
+};
+
 const getExportPayload = (): ExportPayload => ({
   html: editor.innerHTML,
   text: editor.innerText.replace(/\n{3,}/g, "\n\n")
@@ -370,6 +383,16 @@ const wireEditor = () => {
   editor.addEventListener("input", () => {
     pause();
     debounceDocumentSave();
+  });
+
+  editor.addEventListener("focus", pause);
+
+  editor.addEventListener("click", (event) => {
+    if (event.detail >= 3) {
+      event.preventDefault();
+      selectAllEditor();
+      window.setTimeout(selectAllEditor, 0);
+    }
   });
 
   editor.addEventListener("paste", (event) => {
@@ -446,6 +469,12 @@ const wireWindowMovement = () => {
         return;
       }
 
+      const startedInEditor = isEditorTarget(event.target);
+      if (startedInEditor && isEditorFocused()) {
+        dragState = null;
+        return;
+      }
+
       event.preventDefault();
       dragState = {
         startX: event.screenX,
@@ -454,7 +483,7 @@ const wireWindowMovement = () => {
         lastY: event.screenY,
         clientX: event.clientX,
         clientY: event.clientY,
-        startedInEditor: isEditorTarget(event.target),
+        startedInEditor,
         startedAt: performance.now(),
         dragging: false
       };
@@ -501,9 +530,16 @@ const wireWindowMovement = () => {
 
     if (!wasDragging) {
       pause();
-      if (startedInEditor && recordEditorClick(clientX, clientY) >= 3) {
-        selectAllEditor();
-        window.setTimeout(selectAllEditor, 0);
+      if (startedInEditor) {
+        const clickCount = recordEditorClick(clientX, clientY);
+        if (clickCount >= 3) {
+          selectAllEditor();
+          window.setTimeout(selectAllEditor, 0);
+        } else if (clickCount === 2) {
+          selectWordFromPoint(clientX, clientY);
+        } else {
+          placeCaretFromPoint(clientX, clientY);
+        }
       } else {
         placeCaretFromPoint(clientX, clientY);
       }
